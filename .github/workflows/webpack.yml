@@ -1,22 +1,17 @@
-name: Deploy Frontend
+name: Runner Test
 
 on:
-  push:
-    branches:
-      - dev
+  workflow_dispatch:
 
 jobs:
-  deploy:
-    runs-on: self-hosted
+  test:
+    runs-on:
+      - self-hosted
+      - Windows
+      - X64
 
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Install packages
-        run: npm install
-
-      - name: Build
-        run: npm run build
-
-      - name: Restart
-        run: pm2 restart frontend
+      - name: Test
+        run: |
+          echo Runner is working
+          hostname
