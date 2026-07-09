@@ -32,19 +32,25 @@ export default function RootLayout({
 
   return (
     <html lang="en">
-
       <body>
 
         <AudioPlayerProvider>
 
-          {children}
+          <div className="h-screen flex flex-col">
 
-          <AudioPlayer />
+            <main className="flex-1 overflow-y-auto">
+
+              {children}
+
+            </main>
+
+            <AudioPlayer />
+
+          </div>
 
         </AudioPlayerProvider>
 
       </body>
-
     </html>
   );
 }

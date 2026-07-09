@@ -610,124 +610,112 @@ export default function AudioPlayer() {
   return (
 
     <div
-      className="
-        fixed
-        bottom-0
-        left-0
-        right-0
-        h-24
-        bg-zinc-950
-        border-t
-        border-zinc-800
-        flex
-        items-center
-        justify-between
-        px-6
-        z-[9999]
-      "
-    >
-
-      <div
         className="
-          flex
-          items-center
-          gap-4
+            h-24
+            bg-zinc-950
+            border-t
+            border-zinc-800
+            flex
+            items-center
+            justify-between
+            px-6
+            shrink-0
         "
-      >
+    >
+      {/*LEFT  */}
+      <div className="flex items-center gap-4 min-w-0">
 
         <img
-          src={currentTrack.poster}
-          className="
-            w-14
-            h-14
-            rounded-lg
-            object-cover
-          "
+            src={currentTrack.poster}
+            className="w-14 h-14 rounded-lg object-cover"
         />
 
-        <div>
+        <div className="min-w-0">
 
-          <p className="font-semibold">
+            <p className="font-semibold truncate">
+                {currentTrack.title}
+            </p>
 
-            {currentTrack.title}
-
-          </p>
-
-          <p
-            className="
-              text-sm
-              text-zinc-400
-            "
-          >
-
-            {currentTrack.artist}
-
-          </p>
+            <p className="text-sm text-zinc-400 truncate">
+                {currentTrack.artist}
+            </p>
 
         </div>
 
       </div>
+      {/*CENTER */}
 
+      <div className="flex justify-center">
+
+          {!isNative && (
+
+            <audio
+              ref={audioRef}
+              controls
+              preload="metadata"
+              crossOrigin="anonymous"
+              onPause={async () => {
+                await saveHistory(
+                    false,
+                    currentTrack,
+                    0
+                );
+              }}
+              onEnded={async () => {
+
+                console.log(
+                  'TRACK ENDED',
+                  currentTrack?.title
+                );
+
+                await saveHistory(
+                    true,
+                    currentTrack,
+                    0
+                );
+
+                nextTrack();
+
+              }}
+            />
+          )}      
+      </div>
+
+      {/*RIGHT */}
       <div
-        className="
-          flex
-          items-center
-          gap-4
-        "
+          className="
+              flex
+              justify-end
+              items-center
+              gap-3
+          "
       >
 
-        <button onClick={handlePrevious}>⏮</button>
-        <button onClick={handlePlay}>▶</button>
-        <button onClick={handlePause}>⏸</button>
-        <button onClick={handleNext}>⏭</button>
+          <button onClick={handlePrevious}>⏮</button>
+
+          <button onClick={handlePlay}>▶</button>
+
+          <button onClick={handlePause}>⏸</button>
+
+          <button onClick={handleNext}>⏭</button>
+
+          <button
+              onClick={closePlayer}
+              className="
+                  w-9
+                  h-9
+                  rounded-full
+                  hover:bg-zinc-800
+                  transition
+                  text-lg
+              "
+          >
+              ✕
+          </button>
 
       </div>
 
-      {!isNative && (
-
-        <audio
-          ref={audioRef}
-          controls
-          preload="metadata"
-          crossOrigin="anonymous"
-          onPause={async () => {
-            await saveHistory(
-                false,
-                currentTrack,
-                0
-            );
-          }}
-          onEnded={async () => {
-
-            console.log(
-              'TRACK ENDED',
-              currentTrack?.title
-            );
-
-            await saveHistory(
-                true,
-                currentTrack,
-                0
-            );
-
-            nextTrack();
-
-          }}
-        />
-      )}
-      <button
-            onClick={closePlayer}
-            className="
-                absolute
-                top-4
-                right-5
-                text-2xl
-                text-zinc-400
-                hover:text-white
-            "
-        >
-            ✕
-        </button>
+      
 
     </div>
 
