@@ -28,11 +28,11 @@ export default function AudioPlayer() {
     playlist,
     nextTrack,
     previousTrack,
-    syncToIndex
+    syncToIndex,
+    audioRef,
+    closePlayer,
+    showPlayer
   } = useAudioPlayer();
-
-  const audioRef =
-    useRef<HTMLAudioElement>(null);
 
   const queuedPlaylistRef =
     useRef<any[] | null>(null);
@@ -529,10 +529,8 @@ export default function AudioPlayer() {
     isNative
   ]);
 
-  if (!currentTrack) {
-
-    return null;
-
+  if (!showPlayer || !currentTrack) {
+      return null;
   }
 
   
@@ -714,6 +712,20 @@ export default function AudioPlayer() {
 
           }}
         />
+
+        <button
+            onClick={closePlayer}
+            className="
+                absolute
+                top-4
+                right-5
+                text-2xl
+                text-zinc-400
+                hover:text-white
+            "
+        >
+            ✕
+        </button>
 
       )}
 

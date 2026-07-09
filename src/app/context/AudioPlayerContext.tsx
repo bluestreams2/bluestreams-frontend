@@ -3,7 +3,8 @@
 import {
   createContext,
   useContext,
-  useState
+  useState,
+  useRef
 } from 'react';
 
 const AudioPlayerContext =
@@ -17,6 +18,10 @@ export function AudioPlayerProvider({
 
   const [currentTrack, setCurrentTrack] =
     useState<any>(null);
+
+  const audioRef = useRef<HTMLAudioElement>(null);
+
+  const [showPlayer, setShowPlayer] = useState(false);
 
   const [playlist, setPlaylist] =
     useState<any[]>([]);
@@ -35,10 +40,13 @@ function playTrack(track: any, tracks: any[] = []) {
     console.log("PLAYTRACK CALLED");
     console.log(track);
 
-    setCurrentTrack(track);
+    const normalized = normalize(track);
+
+    setCurrentTrack(normalized);
+    setShowPlayer(true);
 
     if (tracks.length > 0) {
-        setPlaylist(tracks);
+        setPlaylist(tracks.map(normalize));
     }
 }
 
@@ -93,6 +101,29 @@ function playTrack(track: any, tracks: any[] = []) {
     }
   }
 
+  const closePlayer = async () => {
+
+      if (Capacitor.isNativePlatform()) {
+
+          try {
+              await MediaControls.pause();
+          } catch {}
+
+      }
+
+      if (audioRef.current) {
+
+          audioRef.current.pause();
+          audioRef.current.currentTime = 0;
+          audioRef.current.src = "";
+
+      }
+
+      setCurrentTrack(null);
+      setPlaylist([]);
+      setShowPlayer(false);
+  };
+
   function syncToIndex(index:number){
 
       if(
@@ -124,17 +155,21 @@ function playTrack(track: any, tracks: any[] = []) {
   return (
 
     <AudioPlayerContext.Provider
-    value={{
-        currentTrack,
-        playlist,
-        playTrack,
-        nextTrack,
-        previousTrack,
-        syncToIndex,
-        setCurrentTrack,
-        setPlaylist,
-        setQueue
-    }}>
+      value={{
+          currentTrack,
+          playlist,
+          playTrack,
+          nextTrack,
+          previousTrack,
+          syncToIndex,
+          setCurrentTrack,
+          setPlaylist,
+          setQueue,
+
+          audioRef,
+          showPlayer,
+          closePlayer
+      }}>
 
       {children}
 
