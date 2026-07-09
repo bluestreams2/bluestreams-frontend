@@ -11,6 +11,10 @@ import {
   Capacitor
 } from '@capacitor/core';
 
+import {
+  MediaControls
+} from '@/app/lib/mediaControls';
+
 const AudioPlayerContext =
   createContext<any>(null);
 
