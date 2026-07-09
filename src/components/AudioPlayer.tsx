@@ -712,8 +712,8 @@ export default function AudioPlayer() {
 
           }}
         />
-
-        <button
+      )}
+      <button
             onClick={closePlayer}
             className="
                 absolute
@@ -726,8 +726,6 @@ export default function AudioPlayer() {
         >
             ✕
         </button>
-
-      )}
 
     </div>
 
