@@ -297,16 +297,18 @@ export default function AudioPlayer() {
     audio.load();
 
     audio.play()
-      .catch(error => {
+      .catch((error: unknown) => {
 
-        if (
-          error?.name !==
-          'AbortError'
-        ) {
+        if (error instanceof DOMException) {
 
-          console.error(error);
+          if (error.name !== 'AbortError') {
+            console.error(error);
+          }
 
+          return;
         }
+
+        console.error(error);
 
       });
 
