@@ -7,6 +7,10 @@ import {
   useRef
 } from 'react';
 
+import {
+  Capacitor
+} from '@capacitor/core';
+
 const AudioPlayerContext =
   createContext<any>(null);
 
