@@ -7,6 +7,11 @@ import AudioPlayer
 import {
   AudioPlayerProvider
 } from '@/app/context/AudioPlayerContext';
+import FetchInterceptor
+    from "@/components/FetchInterceptor";
+
+import SessionHeartbeat
+    from "@/components/SessionHeartbeat";
 
 
 const geistSans = Geist({
@@ -33,6 +38,10 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
+
+        <FetchInterceptor />
+
+        <SessionHeartbeat />
 
         <AudioPlayerProvider>
 
