@@ -16,8 +16,12 @@ export default function SessionHeartbeat() {
 
         async function heartbeat() {
             try {
+                const token = localStorage.getItem("token");
                 const response = await fetch(`${API_URL}/auth/check`, {
                     credentials: 'include',
+                    headers: {
+                        Authorization: `Bearer ${token}`
+                    }
                 });
 
                 if (response.status === 401) {
