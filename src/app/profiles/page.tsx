@@ -19,90 +19,50 @@ export default function ProfilesPage() {
   const [error, setError] =
     useState('');
 
+  
+
   useEffect(() => {
+      const token = localStorage.getItem('token');
 
-    const token =
-      localStorage.getItem('token');
+      if (!token) {
+          router.push('/login');
+          return;
+      }
 
-    if (!token) {
+      let cancelled = false;
+      //loadProfiles(() => cancelled);
 
-      router.push('/login');
-
-      return;
-    }
-
-    loadProfiles();
-
+      return () => {
+          cancelled = true;
+      };
   }, []);
 
-  async function loadProfiles() {
+  async function loadProfiles(isCancelled: () => boolean) {
+      try {
+          const token = localStorage.getItem('token');
 
-    try {
+          const response = await fetch(`${API_URL}/profiles`, {
+              headers: { Authorization: `Bearer ${token}` },
+          });
 
-      const token =
-        localStorage.getItem('token');
+          if (isCancelled()) return; // component unmounted mid-flight — ignore this result
 
-      const response =
-        await fetch(
-          `${API_URL}/profiles`,
-          {
-            headers: {
-              Authorization:
-                `Bearer ${token}`
-            }
+          const text = await response.text();
+
+          if (!response.ok) {
+              setError(`Backend returned ${response.status}`);
+              setLoading(false);
+              return;
           }
-        );
 
-      console.log(
-        'PROFILE STATUS',
-        response.status
-      );
-
-      const text =
-        await response.text();
-
-      console.log(
-        'PROFILE BODY',
-        text
-      );
-
-      if (!response.ok) {
-
-        setError(
-          `Backend returned ${response.status}`
-        );
-
-        setLoading(false);
-
-        return;
+          setProfiles(text ? JSON.parse(text) : []);
+          setLoading(false);
+      } catch (err) {
+          if (isCancelled()) return;
+          console.error(err);
+          setError('Unable to load profiles');
+          setLoading(false);
       }
-
-      if (!text) {
-
-        setProfiles([]);
-
-        setLoading(false);
-
-        return;
-      }
-
-      const data =
-        JSON.parse(text);
-
-      setProfiles(data);
-
-      setLoading(false);
-
-    } catch (err) {
-
-      console.error(err);
-
-      setError(
-        'Unable to load profiles'
-      );
-
-      setLoading(false);
-    }
   }
 
   function selectProfile(
