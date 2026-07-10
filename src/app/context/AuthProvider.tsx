@@ -50,10 +50,13 @@ export default function AuthProvider({
                 return response;
             }
 
-            const refreshResponse =
-                await originalFetch(
-                    `${process.env.NEXT_PUBLIC_API_URL}/auth/refresh`
-                );
+            const refreshResponse = await originalFetch(
+                `${process.env.NEXT_PUBLIC_API_URL}/auth/refresh`,
+                {
+                    method: 'POST',
+                    credentials: 'include', // sends the refreshToken cookie
+                }
+            );
 
             if (!refreshResponse.ok) {
 
