@@ -12,6 +12,8 @@ import FetchInterceptor
 
 import SessionHeartbeat
     from "@/components/SessionHeartbeat";
+import AuthProvider
+from "@/app/context/AuthProvider";
 
 
 const geistSans = Geist({
@@ -47,13 +49,16 @@ export default function RootLayout({
 
           <div className="h-screen flex flex-col">
 
-            <main className="flex-1 overflow-y-auto">
+            <AuthProvider>
+              <main className="flex-1 overflow-y-auto">
 
-              {children}
+                {children}
 
-            </main>
+              </main>
 
-            <AudioPlayer />
+              <AudioPlayer />
+            </AuthProvider>
+            
 
           </div>
 
