@@ -2,19 +2,17 @@
 
 import { useEffect } from 'react';
 import { usePathname } from 'next/navigation';
+import { hasAnyCredential } from '@/app/lib/auth';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
-
-// Routes where there is no session to check, and a 401 is expected/normal.
 const PUBLIC_ROUTES = ['/login', '/register'];
 
 export default function SessionHeartbeat() {
     const pathname = usePathname();
 
     useEffect(() => {
-        if (PUBLIC_ROUTES.includes(pathname)) {
-            return; // nothing to heartbeat on a public page
-        }
+        if (PUBLIC_ROUTES.includes(pathname)) return;
+        if (!hasAnyCredential()) return; // nothing to check, avoid a guaranteed 401
 
         async function heartbeat() {
             try {
@@ -24,8 +22,6 @@ export default function SessionHeartbeat() {
 
                 if (response.status === 401) {
                     localStorage.clear();
-
-                    // Guard against redirect-loops if we're already there.
                     if (window.location.pathname !== '/login') {
                         window.location.href = '/login';
                     }
