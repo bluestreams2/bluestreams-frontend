@@ -54,12 +54,11 @@ export default function LoginPage() {
         return;
       }
 
-      const token =
-        await response.text();
+      const data = await response.json();
 
       localStorage.setItem(
-        'token',
-        token
+          "token",
+          data.token
       );
 
       router.push(
