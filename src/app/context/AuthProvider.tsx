@@ -23,11 +23,26 @@ export default function AuthProvider({
             const headers =
                 new Headers(init?.headers);
 
-            if (token) {
+            const url =
+                typeof input === "string"
+                    ? input
+                    : input instanceof URL
+                        ? input.toString()
+                        : input.url;
+
+            const isApi =
+                url.startsWith(process.env.NEXT_PUBLIC_API_URL!);
+
+            const isMedia =
+                url.startsWith(process.env.NEXT_PUBLIC_MEDIA_URL!);
+
+            if (token && isApi && !isMedia) {
+
                 headers.set(
                     "Authorization",
                     `Bearer ${token}`
                 );
+
             }
 
             let response =
@@ -39,7 +54,9 @@ export default function AuthProvider({
             if (
                 response.status !== 401
             ) {
-                return response;
+                if (!isApi) {
+                    return response;
+                }
             }
 
             // Don't refresh the refresh request itself
