@@ -38,10 +38,20 @@ export default function AuthProvider({
 
             if (token && isApi && !isMedia) {
 
-                headers.set(
-                    "Authorization",
-                    `Bearer ${token}`
-                );
+                const url =
+                    typeof input === "string"
+                        ? input
+                        : input.toString();
+
+                if (
+                    token &&
+                    url.startsWith(process.env.NEXT_PUBLIC_API_URL!)
+                ) {
+                    headers.set(
+                        "Authorization",
+                        `Bearer ${token}`
+                    );
+                }
 
             }
 
