@@ -156,61 +156,84 @@ export default function TVPage() {
 
     
 
-    /* Player */
+    // Direct media files (no HLS manifest) need Shaka Player instead of hls.js
+    const isDirectFile = (url?: string) => {
+        if (!url) return false;
+        return /\.(mkv|mp4|avi)(\?.*)?$/i.test(url.trim());
+    };
 
+    /* Player */
     useEffect(() => {
 
-        if (!selected)
-            return;
+        if (!selected) return;
 
-        const video =
-            videoRef.current;
-
-        if (!video)
-            return;
+        const video = videoRef.current;
+        if (!video) return;
 
         video.pause();
 
-        if (Hls.isSupported()) {
+        const url: string = selected.streamUrl;
 
-            const hls =
-                new Hls();
+        let hls: Hls | null = null;
+        let shakaPlayer: any = null;
+        let cancelled = false;
 
-            hls.loadSource(selected.streamUrl);
+        if (isDirectFile(url)) {
 
-            hls.attachMedia(video);
+            // .mkv / .mp4 / .avi -> Shaka Player
+            (async () => {
 
-            hls.on(
-                Hls.Events.MANIFEST_PARSED,
-                () => {
+                // @ts-ignore - shaka-player ships without bundled TS types
+                const shaka = (await import('shaka-player/dist/shaka-player.ui.js')).default;
 
-                    video.play()
-                        .catch(() => {});
+                if (cancelled) return;
 
+                shaka.polyfill.installAll();
+
+                if (!shaka.Player.isBrowserSupported()) {
+                    console.error('Shaka Player is not supported in this browser');
+                    return;
                 }
-            );
 
-            return () => {
+                shakaPlayer = new shaka.Player(video);
 
-                hls.destroy();
+                shakaPlayer.addEventListener('error', (event: any) => {
+                    console.error('Shaka Player error', event.detail);
+                });
 
-            };
+                try {
+                    await shakaPlayer.load(url);
+                    if (!cancelled) {
+                        video.play().catch(() => {});
+                    }
+                } catch (err) {
+                    console.error('Shaka Player failed to load', url, err);
+                }
+
+            })();
+
+        } else if (Hls.isSupported()) {
+
+            // .m3u8 -> hls.js
+            hls = new Hls();
+            hls.loadSource(url);
+            hls.attachMedia(video);
+            hls.on(Hls.Events.MANIFEST_PARSED, () => {
+                video.play().catch(() => {});
+            });
+
+        } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+
+            video.src = url;
+            video.play().catch(() => {});
 
         }
 
-        if (
-            video.canPlayType(
-                'application/vnd.apple.mpegurl'
-            )
-        ) {
-
-            video.src =
-                selected.streamUrl;
-
-            video.play()
-                .catch(() => {});
-
-        }
+        return () => {
+            cancelled = true;
+            if (hls) hls.destroy();
+            if (shakaPlayer) shakaPlayer.destroy();
+        };
 
     }, [selected]);
 
