@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { useMemo } from "react";
 import Hls from 'hls.js';
 
 import Navbar from '@/components/Navbar';
@@ -20,32 +19,26 @@ export default function TVPage() {
     const [provider, setProvider] =
         useState<number>(0);
 
+    const [groups, setGroups] =
+        useState<string[]>([]);
+
+    const [groupFilter, setGroupFilter] =
+        useState<string>('');
+
+    const [groupsLoading, setGroupsLoading] =
+        useState(false);
+
     const [channels, setChannels] =
         useState<any[]>([]);
-
 
     const [selected, setSelected] =
         useState<any>(null);
 
     const [search, setSearch] =
         useState('');
-    
-    const [loading, setLoading] = useState(false);
 
-    const [groupFilter, setGroupFilter] = useState('All');
-
-    const groups = useMemo(() => {
-
-        return [
-            "All",
-            ...new Set(
-                channels
-                    .map(c => c.groupName?.trim())
-                    .filter(Boolean)
-            )
-        ].sort();
-
-    }, [channels]);
+    const [loading, setLoading] =
+        useState(false);
 
     const getLogo = (logo?: string) => {
 
@@ -62,45 +55,28 @@ export default function TVPage() {
 
     };
 
-    const filtered = useMemo(() => {
+    // Direct media files (no HLS manifest) need Shaka Player instead of hls.js
+    const isDirectFile = (url?: string) => {
 
-        const result = channels.filter(channel => {
+        if (!url)
+            return false;
 
-            const group =
-                (channel.groupName ?? "").trim().toLowerCase();
+        return /\.(mkv|mp4|avi)(\?.*)?$/i.test(url.trim());
 
-            const selectedGroup =
-                groupFilter.trim().toLowerCase();
+    };
+
+    // Search only narrows within the currently loaded (single-group) channel
+    // list, so this stays cheap even for huge providers.
+    const filtered = search.trim() === ''
+        ? channels
+        : channels.filter(channel => {
 
             const name =
                 (channel.name ?? "").trim().toLowerCase();
 
-            const text =
-                search.trim().toLowerCase();
-
-            const matchesGroup =
-                selectedGroup === "all" ||
-                group === selectedGroup;
-
-            const matchesSearch =
-                text === "" ||
-                name.includes(text);
-
-            return matchesGroup && matchesSearch;
+            return name.includes(search.trim().toLowerCase());
 
         });
-
-        console.log({
-            groupFilter,
-            search,
-            total: channels.length,
-            filtered: result.length,
-            first: result[0]
-        });
-
-        return result;
-
-    }, [channels, groupFilter, search]);
 
     /* Load IPTV providers */
 
@@ -122,57 +98,87 @@ export default function TVPage() {
 
     }, []);
 
-    /* Load channels */
+    /* Load groups for the selected provider, preselect the first one.
+       This is a cheap "distinct group names" query — it never touches the
+       95k-row channel table directly. */
 
     useEffect(() => {
 
-         if (!provider) return;
+        if (!provider)
+            return;
+
+        setGroupsLoading(true);
+        setGroups([]);
+        setGroupFilter('');
+        setChannels([]);
+        setSelected(null);
+
+        fetch(`${API_URL}/iptv/${provider}/groups`)
+            .then(r => r.json())
+            .then((data: string[]) => {
+
+                setGroups(data);
+
+                if (data.length > 0) {
+
+                    setGroupFilter(data[0]);
+
+                }
+
+            })
+            .finally(() => setGroupsLoading(false));
+
+    }, [provider]);
+
+    /* Load channels for provider + selected group only.
+       Never fetches the full 95k-row list unless the user explicitly
+       picks "All". */
+
+    useEffect(() => {
+
+        if (!provider || !groupFilter)
+            return;
+
         setLoading(true);
 
-        fetch(`${API_URL}/iptv/${provider}`)
+        fetch(`${API_URL}/iptv/${provider}?group=${encodeURIComponent(groupFilter)}`)
             .then(r => r.json())
             .then(data => {
 
-                console.log(data[0]);
-
                 setChannels(data);
-
-              
 
                 if (data.length > 0) {
 
                     setSelected(data[0]);
 
+                } else {
+
+                    setSelected(null);
+
                 }
 
-            }) 
-            .finally(() => setLoading(false));;
+            })
+            .finally(() => setLoading(false));
 
-        
-
-    }, [provider]);
-
-    /* Search */
-
-    
-
-    // Direct media files (no HLS manifest) need Shaka Player instead of hls.js
-    const isDirectFile = (url?: string) => {
-        if (!url) return false;
-        return /\.(mkv|mp4|avi)(\?.*)?$/i.test(url.trim());
-    };
+    }, [provider, groupFilter]);
 
     /* Player */
+
     useEffect(() => {
 
-        if (!selected) return;
+        if (!selected)
+            return;
 
-        const video = videoRef.current;
-        if (!video) return;
+        const video =
+            videoRef.current;
+
+        if (!video)
+            return;
 
         video.pause();
 
-        const url: string = selected.streamUrl;
+        const url: string =
+            selected.streamUrl;
 
         let hls: Hls | null = null;
         let shakaPlayer: any = null;
@@ -186,7 +192,8 @@ export default function TVPage() {
                 // @ts-ignore - shaka-player ships without bundled TS types
                 const shaka = (await import('shaka-player/dist/shaka-player.ui.js')).default;
 
-                if (cancelled) return;
+                if (cancelled)
+                    return;
 
                 shaka.polyfill.installAll();
 
@@ -202,12 +209,17 @@ export default function TVPage() {
                 });
 
                 try {
+
                     await shakaPlayer.load(url);
+
                     if (!cancelled) {
                         video.play().catch(() => {});
                     }
+
                 } catch (err) {
+
                     console.error('Shaka Player failed to load', url, err);
+
                 }
 
             })();
@@ -216,23 +228,46 @@ export default function TVPage() {
 
             // .m3u8 -> hls.js
             hls = new Hls();
-            hls.loadSource(url);
-            hls.attachMedia(video);
-            hls.on(Hls.Events.MANIFEST_PARSED, () => {
-                video.play().catch(() => {});
-            });
 
-        } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+            hls.loadSource(url);
+
+            hls.attachMedia(video);
+
+            hls.on(
+                Hls.Events.MANIFEST_PARSED,
+                () => {
+
+                    video.play()
+                        .catch(() => {});
+
+                }
+            );
+
+        } else if (
+            video.canPlayType(
+                'application/vnd.apple.mpegurl'
+            )
+        ) {
 
             video.src = url;
-            video.play().catch(() => {});
+
+            video.play()
+                .catch(() => {});
 
         }
 
         return () => {
+
             cancelled = true;
-            if (hls) hls.destroy();
-            if (shakaPlayer) shakaPlayer.destroy();
+
+            if (hls) {
+                hls.destroy();
+            }
+
+            if (shakaPlayer) {
+                shakaPlayer.destroy();
+            }
+
         };
 
     }, [selected]);
@@ -270,10 +305,11 @@ export default function TVPage() {
 
                         <select
                             value={groupFilter}
-                            onChange={(e)=>setGroupFilter(e.target.value)}
+                            onChange={(e) => setGroupFilter(e.target.value)}
+                            disabled={groupsLoading || groups.length === 0}
                             className="bg-zinc-900 rounded-xl px-4 py-3"
                         >
-                            {groups.map(group=>(
+                            {groups.map(group => (
                                 <option
                                     key={group}
                                     value={group}
@@ -286,7 +322,6 @@ export default function TVPage() {
                     </div>
 
                 </div>
-                
 
                 <div className="flex gap-8">
 
@@ -304,7 +339,7 @@ export default function TVPage() {
                                 )
                             }
 
-                            placeholder="Search channel..."
+                            placeholder="Search channel in this group..."
 
                             className="
                                 w-full
@@ -316,22 +351,12 @@ export default function TVPage() {
 
                         />
 
-                        {/* <select
-                            value={groupFilter}
-                            onChange={(e)=>setGroupFilter(e.target.value)}
-                            className="bg-zinc-900 rounded-xl px-4 w-56"
-                        >
-                            {groups.map(group=>(
-                                <option key={group}>{group}</option>
-                            ))}
-                        </select> */}
-
-                        <p className="text-red-500 mb-2">
-                            Showing {filtered.length} channels
+                        <p className="text-zinc-400 mb-2">
+                            Showing {filtered.length} channels in "{groupFilter || '...'}"
                         </p>
 
-                        <div className="h-[78vh] overflow-y-auto">  
-                             {loading ? (
+                        <div className="h-[78vh] overflow-y-auto">
+                             {loading || groupsLoading ? (
 
                                 <div className="flex justify-center items-center h-full">
 
