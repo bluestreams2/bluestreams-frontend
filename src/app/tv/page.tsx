@@ -189,7 +189,8 @@ export default function TVPage() {
 
         video.removeAttribute("src");
 
-        const url = selected.streamUrl;
+        const url =
+                 `${API_URL}/iptv/proxy/${selected.id}`;
 
         if (Hls.isSupported()) {
 
