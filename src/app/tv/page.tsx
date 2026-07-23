@@ -145,11 +145,20 @@ export default function TVPage() {
             .then(r => r.json())
             .then(data => {
 
-                setChannels(data);
+                const proxied = data.map((channel: any) => ({
 
-                if (data.length > 0) {
+                    ...channel,
 
-                    setSelected(data[0]);
+                    streamUrl:
+                        `${API_URL}/iptv/proxy/${channel.id}`
+
+                }));
+
+                setChannels(proxied);
+
+                if (proxied.length > 0) {
+
+                    setSelected(proxied[0]);
 
                 } else {
 
@@ -169,104 +178,53 @@ export default function TVPage() {
         if (!selected)
             return;
 
-        const video =
-            videoRef.current;
+        const video = videoRef.current;
 
         if (!video)
             return;
 
+        let hls: Hls | null = null;
+
         video.pause();
 
-        const url: string =
-            selected.streamUrl;
+        video.removeAttribute("src");
 
-        let hls: Hls | null = null;
-        let shakaPlayer: any = null;
-        let cancelled = false;
+        const url = selected.streamUrl;
 
-        if (isDirectFile(url)) {
+        if (Hls.isSupported()) {
 
-            // .mkv / .mp4 / .avi -> Shaka Player
-            (async () => {
+            hls = new Hls({
 
-                // @ts-ignore - shaka-player ships without bundled TS types
-                const shaka = (await import('shaka-player/dist/shaka-player.ui.js')).default;
+                enableWorker: true,
 
-                if (cancelled)
-                    return;
+                lowLatencyMode: true
 
-                shaka.polyfill.installAll();
-
-                if (!shaka.Player.isBrowserSupported()) {
-                    console.error('Shaka Player is not supported in this browser');
-                    return;
-                }
-
-                shakaPlayer = new shaka.Player(video);
-
-                shakaPlayer.addEventListener('error', (event: any) => {
-                    console.error('Shaka Player error', event.detail);
-                });
-
-                try {
-
-                    await shakaPlayer.load(url);
-
-                    if (!cancelled) {
-                        video.play().catch(() => {});
-                    }
-
-                } catch (err) {
-
-                    console.error('Shaka Player failed to load', url, err);
-
-                }
-
-            })();
-
-        } else if (Hls.isSupported()) {
-
-            // .m3u8 -> hls.js
-            hls = new Hls();
+            });
 
             hls.loadSource(url);
 
             hls.attachMedia(video);
 
-            hls.on(
-                Hls.Events.MANIFEST_PARSED,
-                () => {
+            hls.on(Hls.Events.MANIFEST_PARSED, () => {
 
-                    video.play()
-                        .catch(() => {});
+                video.play().catch(() => {});
 
-                }
-            );
+            });
 
-        } else if (
-            video.canPlayType(
-                'application/vnd.apple.mpegurl'
-            )
-        ) {
+        }
+
+        else {
 
             video.src = url;
 
-            video.play()
-                .catch(() => {});
+            video.play().catch(() => {});
 
         }
 
         return () => {
 
-            cancelled = true;
-
-            if (hls) {
+            if (hls)
                 hls.destroy();
-            }
-
-            if (shakaPlayer) {
-                shakaPlayer.destroy();
-            }
 
         };
 
