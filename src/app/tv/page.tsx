@@ -171,6 +171,7 @@ export default function TVPage() {
 
     }, [provider, groupFilter]);
 
+    
     /* Player */
 
     useEffect(() => {
@@ -183,49 +184,52 @@ export default function TVPage() {
         if (!video)
             return;
 
-        let hls: Hls | null = null;
-
         video.pause();
 
         video.removeAttribute("src");
 
+        video.load();
+
         const url =
-                 `${API_URL}/iptv/proxy/${selected.id}`;
+            `${API_URL}/iptv/proxy/${selected.id}`;
 
-        if (Hls.isSupported()) {
+        console.log("Playing:", url);
 
-            hls = new Hls({
+        video.src = url;
 
-                enableWorker: true,
+        video.onloadedmetadata = () => {
 
-                lowLatencyMode: true
+            console.log("Metadata loaded");
 
-            });
+            video.play().catch(console.error);
 
-            hls.loadSource(url);
+        };
 
-            hls.attachMedia(video);
+        video.onerror = () => {
 
-            hls.on(Hls.Events.MANIFEST_PARSED, () => {
+            console.error("VIDEO ERROR", video.error);
 
-                video.play().catch(() => {});
+        };
 
-            });
+        video.onwaiting = () => {
 
-        }
+            console.log("Buffering...");
 
-        else {
+        };
 
-            video.src = url;
+        video.onplaying = () => {
 
-            video.play().catch(() => {});
+            console.log("Playing");
 
-        }
+        };
 
         return () => {
 
-            if (hls)
-                hls.destroy();
+            video.pause();
+
+            video.removeAttribute("src");
+
+            video.load();
 
         };
 
@@ -434,19 +438,16 @@ export default function TVPage() {
                                 </p>
 
                                 <video
-
                                     ref={videoRef}
-
                                     controls
-
                                     autoPlay
-
+                                    playsInline
+                                    muted={false}
                                     className="
                                         w-full
                                         rounded-2xl
                                         bg-black
                                     "
-
                                 />
 
                             </>
