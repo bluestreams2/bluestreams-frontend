@@ -180,61 +180,122 @@ export default function TVPage() {
 
         const video = videoRef.current;
 
-        if (!video)
+        if (video == null)
             return;
 
+        const videoElement: HTMLVideoElement = video;
+
         let hls: Hls | null = null;
+        let cancelled = false;
 
-        async function start() {
+        async function startPlayer() {
 
-            await fetch(
-                `${API_URL}/iptv/hls/start/${selected.id}`
-            );
+            try {
 
-            await new Promise(r =>
-                setTimeout(r, 3000)
-            );
+                videoElement.pause();
+                videoElement.removeAttribute("src");
+                videoElement.load();
 
-            const url =
-                `${API_URL}/iptv/hls/${selected.id}/playlist.m3u8`;
-
-            if (Hls.isSupported()) {
-
-                hls = new Hls();
-
-                hls.loadSource(url);
-
-                hls.attachMedia(video);
-
-                hls.on(
-                    Hls.Events.MANIFEST_PARSED,
-                    () => {
-
-                        video.play().catch(() => {});
-
-                    }
+                // Tell Quarkus to start FFmpeg
+                await fetch(
+                    `${API_URL}/iptv/hls/start/${selected.id}`
                 );
 
-            } else {
+                // Give FFmpeg a few seconds to create the playlist
+                await new Promise(resolve =>
+                    setTimeout(resolve, 3000)
+                );
 
-                video.src = url;
+                if (cancelled)
+                    return;
 
-                video.play();
+                const playlistUrl =
+                    `${API_URL}/iptv/hls/${selected.id}/playlist.m3u8`;
+
+                console.log("Loading:", playlistUrl);
+
+                if (Hls.isSupported()) {
+
+                    hls = new Hls({
+
+                        enableWorker: true,
+
+                        lowLatencyMode: true
+
+                    });
+
+                    hls.loadSource(playlistUrl);
+
+                    hls.attachMedia(videoElement);
+
+                    hls.on(
+                        Hls.Events.MANIFEST_PARSED,
+                        () => {
+
+                            console.log("Manifest loaded");
+
+                            videoElement.play().catch(console.error);
+
+                        }
+                    );
+
+                    hls.on(
+                        Hls.Events.ERROR,
+                        (_, data) => {
+
+                            console.error("HLS ERROR", data);
+
+                        }
+                    );
+
+                }
+                else if (
+                    videoElement.canPlayType(
+                        "application/vnd.apple.mpegurl"
+                    )
+                ) {
+
+                    videoElement.src = playlistUrl;
+
+                    videoElement.play().catch(console.error);
+
+                }
+                else {
+
+                    console.error("HLS not supported");
+
+                }
+
+            }
+            catch (e) {
+
+                console.error(e);
 
             }
 
         }
 
-        start();
+        startPlayer();
 
         return () => {
 
-            if (hls)
+            cancelled = true;
+
+            if (hls) {
+
                 hls.destroy();
+
+            }
+
+            videoElement.pause();
+
+            videoElement.removeAttribute("src");
+
+            videoElement.load();
 
         };
 
-    }, [selected]);
+    }, [selected, API_URL]);
 
     return (
 
