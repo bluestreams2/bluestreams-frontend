@@ -172,8 +172,7 @@ export default function TVPage() {
     }, [provider, groupFilter]);
 
     
-    /* Player */
-
+    /* PLAYER */
     useEffect(() => {
 
         if (!selected)
@@ -184,52 +183,54 @@ export default function TVPage() {
         if (!video)
             return;
 
-        video.pause();
+        let hls: Hls | null = null;
 
-        video.removeAttribute("src");
+        async function start() {
 
-        video.load();
+            await fetch(
+                `${API_URL}/iptv/hls/start/${selected.id}`
+            );
 
-        const url =
-            `${API_URL}/iptv/hls/${selected.id}`;
+            await new Promise(r =>
+                setTimeout(r, 3000)
+            );
 
-        console.log("Playing:", url);
+            const url =
+                `${API_URL}/iptv/hls/${selected.id}/playlist.m3u8`;
 
-        video.src = url;
+            if (Hls.isSupported()) {
 
-        video.onloadedmetadata = () => {
+                hls = new Hls();
 
-            console.log("Metadata loaded");
+                hls.loadSource(url);
 
-            video.play().catch(console.error);
+                hls.attachMedia(video);
 
-        };
+                hls.on(
+                    Hls.Events.MANIFEST_PARSED,
+                    () => {
 
-        video.onerror = () => {
+                        video.play().catch(() => {});
 
-            console.error("VIDEO ERROR", video.error);
+                    }
+                );
 
-        };
+            } else {
 
-        video.onwaiting = () => {
+                video.src = url;
 
-            console.log("Buffering...");
+                video.play();
 
-        };
+            }
 
-        video.onplaying = () => {
+        }
 
-            console.log("Playing");
-
-        };
+        start();
 
         return () => {
 
-            video.pause();
-
-            video.removeAttribute("src");
-
-            video.load();
+            if (hls)
+                hls.destroy();
 
         };
 
