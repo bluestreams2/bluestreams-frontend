@@ -191,7 +191,7 @@ export default function TVPage() {
         video.load();
 
         const url =
-            `${API_URL}/iptv/proxy/${selected.id}`;
+            `${API_URL}/iptv/hls/${selected.id}`;
 
         console.log("Playing:", url);
 
