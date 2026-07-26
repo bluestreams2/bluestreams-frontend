@@ -239,14 +239,19 @@ export default function TVPage() {
                         }
                     );
 
-                    hls.on(
-                        Hls.Events.ERROR,
-                        (_, data) => {
+                    hls.on(Hls.Events.ERROR, (_, data) => {
 
-                            console.error("HLS ERROR", data);
+                        console.log("HLS ERROR");
 
-                        }
-                    );
+                        console.log("type:", data.type);
+
+                        console.log("details:", data.details);
+
+                        console.log("fatal:", data.fatal);
+
+                        console.log(data);
+
+                    });
 
                 }
                 else if (
