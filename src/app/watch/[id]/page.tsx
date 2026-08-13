@@ -7,11 +7,15 @@ import {
 } from 'react';
 
 import {
-  useParams
+  useParams,
+  useRouter
 } from 'next/navigation';
 
 import { Capacitor } from '@capacitor/core';
-import { StatusBar, Style } from '@capacitor/status-bar';
+import {
+  StatusBar,
+  Style
+} from '@capacitor/status-bar';
 
 export default function WatchPage() {
 
@@ -23,6 +27,9 @@ export default function WatchPage() {
 
   const params =
     useParams();
+
+  const router =
+    useRouter();
 
   const id =
     params.id;
@@ -48,6 +55,10 @@ export default function WatchPage() {
   const [resumePosition, setResumePosition] =
     useState(0);
 
+  /*
+   * Load media
+   */
+
   useEffect(() => {
 
     if (!id) {
@@ -57,11 +68,25 @@ export default function WatchPage() {
     fetch(
       `${API_URL}/media/${id}`
     )
-      .then((res) => res.json())
+      .then((res) => {
+
+        if (!res.ok) {
+          throw new Error(
+            `Failed to load media: ${res.status}`
+          );
+        }
+
+        return res.json();
+
+      })
       .then(setMedia)
       .catch(console.error);
 
-  }, [id]);
+  }, [id, API_URL]);
+
+  /*
+   * Load resume position
+   */
 
   useEffect(() => {
 
@@ -101,6 +126,7 @@ export default function WatchPage() {
         }
 
         return JSON.parse(text);
+
       })
       .then((history) => {
 
@@ -118,7 +144,11 @@ export default function WatchPage() {
       })
       .catch(console.error);
 
-  }, [id]);
+  }, [id, API_URL]);
+
+  /*
+   * Shaka Player
+   */
 
   useEffect(() => {
 
@@ -138,9 +168,10 @@ export default function WatchPage() {
         return;
       }
 
-      const shaka = await import(
-        'shaka-player/dist/shaka-player.ui.js'
-      );
+      const shaka =
+        await import(
+          'shaka-player/dist/shaka-player.ui.js'
+        );
 
       await import(
         'shaka-player/dist/controls.css'
@@ -160,12 +191,20 @@ export default function WatchPage() {
         return;
       }
 
+      /*
+       * Create Shaka player
+       */
+
       player =
         new shaka.default.Player();
 
       await player.attach(
         videoRef.current
       );
+
+      /*
+       * Create Shaka UI
+       */
 
       ui =
         new shaka.default.ui.Overlay(
@@ -195,91 +234,111 @@ export default function WatchPage() {
 
       });
 
+      /*
+       * Load DASH
+       */
+
       await player.load(
         media.manifestUrl
       );
 
-      if (Capacitor.isNativePlatform()) {
+      console.log(
+        'DASH LOADED'
+      );
 
-        videoRef.current?.addEventListener(
-          'fullscreenchange',
+      /*
+       * Resume playback
+       */
+
+      if (
+        resumePosition > 10 &&
+        videoRef.current
+      ) {
+
+        const video =
+          videoRef.current;
+
+        const resume =
+          () => {
+
+            console.log(
+              'RESUMING AT',
+              resumePosition
+            );
+
+            if (
+              Number.isFinite(
+                resumePosition
+              )
+            ) {
+
+              video.currentTime =
+                resumePosition;
+
+            }
+
+          };
+
+        if (
+          video.readyState >= 1
+        ) {
+
+          resume();
+
+        } else {
+
+          video.addEventListener(
+            'loadedmetadata',
+            resume,
+            {
+              once: true
+            }
+          );
+
+        }
+
+      }
+
+      /*
+       * Capacitor fullscreen handling
+       */
+
+      if (
+        Capacitor.isNativePlatform() &&
+        videoRef.current
+      ) {
+
+        const handleFullscreenChange =
           async () => {
 
-            if (document.fullscreenElement) {
+            if (
+              document.fullscreenElement
+            ) {
 
               await StatusBar.hide();
 
             } else {
 
               await StatusBar.show();
+
               await StatusBar.setStyle({
                 style: Style.Dark
               });
 
             }
 
-          }
-        );
-
-      }
-
-      console.log(
-        'DASH LOADED'
-      );
-
-      if (
-        resumePosition > 10 &&
-        videoRef.current
-      ) {
+          };
 
         videoRef.current.addEventListener(
-          'loadedmetadata',
-
-          () => {
-
-            if (
-              videoRef.current
-            ) {
-
-              console.log(
-                'RESUMING AT',
-                resumePosition
-              );
-
-              videoRef.current.currentTime =
-                resumePosition;
-
-            }
-
-          },
-
-          { once: true }
-        );
-      }
-
-      if (
-        resumePosition > 10 &&
-        videoRef.current
-      ) {
-
-        videoRef.current.addEventListener(
-          'loadedmetadata',
-          () => {
-
-            if (
-              videoRef.current
-            ) {
-
-              videoRef.current.currentTime =
-                resumePosition;
-
-            }
-
-          },
-          { once: true }
+          'fullscreenchange',
+          handleFullscreenChange
         );
 
       }
+
+      /*
+       * Load subtitles
+       */
 
       try {
 
@@ -293,6 +352,7 @@ export default function WatchPage() {
         if (
           subtitleResponse.ok
         ) {
+
           console.log(
             'SUBTITLE LIST STATUS',
             subtitleResponse.status
@@ -311,20 +371,32 @@ export default function WatchPage() {
                 media.folderName
               )}/${subtitle.file}`;
 
-
             console.log(
               'LOADING SUBTITLE:',
               subtitleUrl
             );
 
-            const test =
-              await fetch(subtitleUrl);
+            try {
 
-            console.log(
-              'SUBTITLE HTTP',
-              test.status,
-              subtitleUrl
-            );
+              const test =
+                await fetch(
+                  subtitleUrl
+                );
+
+              console.log(
+                'SUBTITLE HTTP',
+                test.status,
+                subtitleUrl
+              );
+
+            } catch (err) {
+
+              console.error(
+                'SUBTITLE TEST FAILED',
+                err
+              );
+
+            }
 
             await player.addTextTrackAsync(
 
@@ -341,14 +413,23 @@ export default function WatchPage() {
               subtitle.label
 
             );
+
           }
+
         }
 
       } catch (err) {
 
-        console.error(err);
+        console.error(
+          'SUBTITLE ERROR',
+          err
+        );
 
       }
+
+      /*
+       * Save playback history
+       */
 
       const profileId =
         localStorage.getItem(
@@ -381,7 +462,8 @@ export default function WatchPage() {
 
             const completed =
               duration > 0 &&
-              current >= duration * 0.95;
+              current >=
+                duration * 0.95;
 
             try {
 
@@ -415,16 +497,23 @@ export default function WatchPage() {
             } catch (err) {
 
               console.error(
+                'HISTORY SAVE ERROR',
                 err
               );
 
             }
 
           }, 10000);
+
       }
+
     };
 
     loadPlayer();
+
+    /*
+     * Cleanup
+     */
 
     return () => {
 
@@ -435,6 +524,9 @@ export default function WatchPage() {
         clearInterval(
           saveTimerRef.current
         );
+
+        saveTimerRef.current =
+          null;
 
       }
 
@@ -449,78 +541,322 @@ export default function WatchPage() {
         ui.destroy();
 
       }
+
     };
 
   }, [
     media,
-    resumePosition
+    resumePosition,
+    API_URL,
+    MEDIA_URL
   ]);
+
+  /*
+   * Loading
+   */
 
   if (!media) {
 
     return (
 
-      <div
+      <main
         className="
+          min-h-screen
           bg-black
           text-white
-          min-h-screen
           flex
           items-center
           justify-center
         "
       >
-        Loading...
-      </div>
+
+        <div
+          className="
+            flex
+            flex-col
+            items-center
+            gap-4
+          "
+        >
+
+          <div
+            className="
+              w-10
+              h-10
+              border-4
+              border-zinc-700
+              border-t-white
+              rounded-full
+              animate-spin
+            "
+          />
+
+          <span
+            className="
+              text-zinc-400
+            "
+          >
+            Loading...
+          </span>
+
+        </div>
+
+      </main>
 
     );
+
   }
+
+  /*
+   * Watch page
+   */
 
   return (
 
-    <div
-      ref={containerRef}
-      style={{
-        width: '100%',
-        height: '100vh',
-        backgroundColor: 'black'
-      }}
+    <main
+      className="
+        min-h-screen
+        bg-black
+        text-white
+      "
     >
 
-      <video
-        ref={videoRef}
-        autoPlay
-        controls
-        playsInline={false}
-        webkit-playsinline="false"
-        style={{
-          width: '100%',
-          height: '100%'
-        }}
-        onDoubleClick={() => {
+      {/* Header */}
 
-          const video =
-            videoRef.current;
+      <header
+        className="
+          sticky
+          top-0
+          z-50
+          bg-black/95
+          backdrop-blur
+          border-b
+          border-zinc-900
+        "
+      >
 
-          if (!video) {
-            return;
-          }
+        <div
+          className="
+            max-w-[1600px]
+            mx-auto
+            px-4
+            sm:px-6
+            lg:px-10
+            py-4
+            flex
+            items-center
+            gap-4
+          "
+        >
 
-          if (
-            !document.fullscreenElement
-          ) {
+          {/* Back button */}
 
-            video.requestFullscreen?.();
+          <button
+            type="button"
+            onClick={() => router.back()}
+            aria-label="Go back"
+            className="
+              flex
+              items-center
+              justify-center
+              w-11
+              h-11
+              rounded-full
+              bg-zinc-900
+              hover:bg-zinc-800
+              active:bg-zinc-700
+              transition
+              shrink-0
+            "
+          >
 
-          } else {
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="
+                w-6
+                h-6
+              "
+            >
 
-            document.exitFullscreen?.();
+              <path
+                d="M19 12H5"
+              />
 
-          }
+              <path
+                d="M12 19l-7-7 7-7"
+              />
 
-        }}
-      />
+            </svg>
 
-    </div>
+          </button>
+
+          {/* Title */}
+
+          <div
+            className="
+              min-w-0
+              flex-1
+            "
+          >
+
+            <h1
+              className="
+                text-xl
+                sm:text-2xl
+                lg:text-3xl
+                font-bold
+                truncate
+              "
+            >
+              {media.title ||
+                media.name ||
+                'Watching'}
+            </h1>
+
+            {media.type && (
+
+              <p
+                className="
+                  text-sm
+                  text-zinc-400
+                  mt-0.5
+                "
+              >
+                {media.type}
+              </p>
+
+            )}
+
+          </div>
+
+        </div>
+
+      </header>
+
+      {/* Content */}
+
+      <div
+        className="
+          max-w-[1600px]
+          mx-auto
+          px-4
+          sm:px-6
+          lg:px-10
+          py-6
+          sm:py-8
+        "
+      >
+
+        {/* Player */}
+
+        <section
+          className="
+            w-full
+          "
+        >
+
+          <div
+            ref={containerRef}
+            className="
+              relative
+              w-full
+              aspect-video
+              bg-black
+              rounded-xl
+              sm:rounded-2xl
+              overflow-hidden
+              shadow-2xl
+            "
+          >
+
+            <video
+              ref={videoRef}
+              autoPlay
+              controls
+              playsInline
+              className="
+                absolute
+                inset-0
+                w-full
+                h-full
+                object-contain
+                bg-black
+              "
+              onDoubleClick={() => {
+
+                const video =
+                  videoRef.current;
+
+                if (!video) {
+                  return;
+                }
+
+                if (
+                  !document.fullscreenElement
+                ) {
+
+                  video.requestFullscreen?.();
+
+                } else {
+
+                  document.exitFullscreen?.();
+
+                }
+
+              }}
+            />
+
+          </div>
+
+        </section>
+
+        {/* Information */}
+
+        <section
+          className="
+            mt-6
+            sm:mt-8
+            max-w-5xl
+          "
+        >
+
+          <h2
+            className="
+              text-2xl
+              sm:text-3xl
+              font-bold
+            "
+          >
+            {media.title ||
+              media.name ||
+              'Watching'}
+          </h2>
+
+          {media.description && (
+
+            <p
+              className="
+                mt-3
+                text-zinc-400
+                leading-relaxed
+              "
+            >
+              {media.description}
+            </p>
+
+          )}
+
+        </section>
+
+      </div>
+
+    </main>
+
   );
 }
